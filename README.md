@@ -1,5 +1,3 @@
-Voici un exemple de `README.md` pour ton projet. Il présente les fonctionnalités principales, les étapes d'installation, et comment utiliser l'application.
-
 ---
 
 # Suivi de Localisation en Temps Réel avec React Native & Supabase
