@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, Image } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { supabase } from '../../supabase/supabaseClient';
 import { Picker } from '@react-native-picker/picker'; // Import corrigé
@@ -9,8 +9,7 @@ export default function HomeScreen() {
   const [region, setRegion] = useState(null);
   const [locationSubscription, setLocationSubscription] = useState(null);
   const [mapType, setMapType] = useState('standard'); // État pour le type de carte
-  const [routeCoordinates, setRouteCoordinates] = useState([]); // Stocker les positions pour tracer le chemin
-  const [previousLocation, setPreviousLocation] = useState(null); // Stocker la position précédente pour calculer la distance
+  
 
   useEffect(() => {
     (async () => {
@@ -20,51 +19,35 @@ export default function HomeScreen() {
         return;
       }
 
+      
       // Surveiller la position en temps réel
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
           timeInterval: 1000, // 1 seconde
-          distanceInterval: 1, // 1 mètre
+          distanceInterval: 1, // 1 metre
         },
         async (location) => {
-          const newLocation = {
+          const currentRegion = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-          };
-
-          const currentRegion = {
-            latitude: newLocation.latitude,
-            longitude: newLocation.longitude,
             latitudeDelta: 0.00922,
             longitudeDelta: 0.00421,
           };
           setRegion(currentRegion);
 
-          // Enregistrer la nouvelle position dans Supabase
+          // Enregistrer la localisation dans Supabase
           const { error } = await supabase
             .from('locations')
             .insert([
               {
-                latitude: newLocation.latitude,
-                longitude: newLocation.longitude,
+                latitude: currentRegion.latitude,
+                longitude: currentRegion.longitude,
               },
             ]);
 
           if (error) {
             Alert.alert('Erreur', 'Impossible d\'enregistrer la localisation.');
-          }
-
-          // Vérifier si la position a changé de plus de 10 mètres
-          if (previousLocation) {
-            const distance = calculateDistance(previousLocation, newLocation);
-            if (distance >= 10) {
-              setRouteCoordinates((prev) => [...prev, newLocation]); // Ajouter la nouvelle position au chemin
-              setPreviousLocation(newLocation); // Mettre à jour la position précédente
-            }
-          } else {
-            setPreviousLocation(newLocation);
-            setRouteCoordinates([newLocation]); // Initialiser le chemin avec la première position
           }
         }
       );
@@ -77,26 +60,7 @@ export default function HomeScreen() {
         locationSubscription.remove();
       }
     };
-  }, [previousLocation]);
-
-  // Fonction pour calculer la distance entre deux points géographiques
-  const calculateDistance = (prevLoc, newLoc) => {
-    const toRad = (value) => (value * Math.PI) / 180;
-    const R = 6371e3; // Rayon de la Terre en mètres
-
-    const dLat = toRad(newLoc.latitude - prevLoc.latitude);
-    const dLon = toRad(newLoc.longitude - prevLoc.longitude);
-    const lat1 = toRad(prevLoc.latitude);
-    const lat2 = toRad(newLoc.latitude);
-
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    const distance = R * c; // Distance en mètres
-    return distance;
-  };
+  }, []);
 
   if (!region) {
     return (
@@ -132,26 +96,20 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.mapContainer}>
-        <MapView
-          style={styles.map}
-          region={region} // La carte reste centrée sur la position actuelle
-          mapType={mapType} // Utilisation du type de carte sélectionné
-          showsUserLocation={true} // Affiche un indicateur de position utilisateur
-          followsUserLocation={true} // La carte suit automatiquement la position de l'utilisateur
-        >
-          <Marker
-            title="Vous êtes ici"
-            coordinate={{ latitude: region.latitude, longitude: region.longitude }}
-            pinColor="red" // Couleur du marqueur
-          />
+      <MapView
+        style={styles.map}
+        region={region} // La carte reste centrée sur la position actuelle
+        mapType={mapType} // Utilisation du type de carte sélectionné
+        showsUserLocation={true} // Affiche un indicateur de position utilisateur
+        followsUserLocation={true} // La carte suit automatiquement la position de l'utilisateur
+      >
+        <Marker
+          title="Vous êtes ici"
+          coordinate={{ latitude: region.latitude, longitude: region.longitude }}
+          pinColor="red" // Couleur du marqueur
+        />
+      </MapView>
 
-          {/* Polyline pour tracer le chemin */}
-          <Polyline
-            coordinates={routeCoordinates} // Utiliser les positions enregistrées
-            strokeWidth={4}
-            strokeColor="blue" // Couleur de la ligne
-          />
-        </MapView>
       </View>
 
       <View style={styles.infoContainer}>
