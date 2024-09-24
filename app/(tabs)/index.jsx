@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, Image } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { supabase } from '../../supabase/supabaseClient';
-import { Picker } from '@react-native-picker/picker'; // Import corrigé
+import { Picker } from '@react-native-picker/picker'; 
 
 export default function HomeScreen() {
   const [region, setRegion] = useState(null);
   const [locationSubscription, setLocationSubscription] = useState(null);
-  const [mapType, setMapType] = useState('standard'); // État pour le type de carte
-  
+  const [mapType, setMapType] = useState('standard');
+  const [movementPoints, setMovementPoints] = useState([]); // Points de déplacement
 
   useEffect(() => {
     (async () => {
@@ -19,13 +19,12 @@ export default function HomeScreen() {
         return;
       }
 
-      
       // Surveiller la position en temps réel
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 1000, // 1 seconde
-          distanceInterval: 1, // 1 metre
+          timeInterval: 10000, // Mettre à jour la position toutes les 10 secondes
+          distanceInterval: 5, // Mettre à jour la position toutes les 5 m
         },
         async (location) => {
           const currentRegion = {
@@ -36,9 +35,15 @@ export default function HomeScreen() {
           };
           setRegion(currentRegion);
 
+          // Ajouter la nouvelle position à la liste des points de déplacement
+          setMovementPoints((prevPoints) => [
+            ...prevPoints,
+            { latitude: currentRegion.latitude, longitude: currentRegion.longitude }
+          ]);
+
           // Enregistrer la localisation dans Supabase
           const { error } = await supabase
-            .from('locations')
+            .from('localisation')
             .insert([
               {
                 latitude: currentRegion.latitude,
@@ -70,6 +75,12 @@ export default function HomeScreen() {
     );
   }
 
+  // "config": {
+//         "googleMaps": {
+//           "apikey": "AIzaSyDn7wCqY0h0vSdKp5jVJg4QVfTz5KsOy0"
+//         }
+//       },4519460003705888
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -80,7 +91,6 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Sélecteur pour changer le type de carte */}
       <View style={styles.pickerContainer}>
         <Text style={styles.pickerLabel}>Changer le type de carte :</Text>
         <Picker
@@ -96,20 +106,28 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.mapContainer}>
-      <MapView
-        style={styles.map}
-        region={region} // La carte reste centrée sur la position actuelle
-        mapType={mapType} // Utilisation du type de carte sélectionné
-        showsUserLocation={true} // Affiche un indicateur de position utilisateur
-        followsUserLocation={true} // La carte suit automatiquement la position de l'utilisateur
-      >
-        <Marker
-          title="Vous êtes ici"
-          coordinate={{ latitude: region.latitude, longitude: region.longitude }}
-          pinColor="red" // Couleur du marqueur
-        />
-      </MapView>
+        <MapView
+          style={styles.map}
+          region={region} 
+          mapType={mapType}
+          showsUserLocation={true}
+          followsUserLocation={true}
+        >
+          <Marker
+            title="Vous êtes ici"
+            coordinate={{ latitude: region.latitude, longitude: region.longitude }}
+            pinColor="red"
+          />
 
+          {/* Tracer une ligne pour les points de déplacement */}
+          {movementPoints.length > 1 && (
+            <Polyline
+              coordinates={movementPoints} // Tableau de points de déplacement
+              strokeColor="blue" // Couleur de la ligne
+              strokeWidth={3} // Largeur de la ligne
+            />
+          )}
+        </MapView>
       </View>
 
       <View style={styles.infoContainer}>
@@ -129,7 +147,6 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Styles inchangés...
   container: {
     padding: 20,
     backgroundColor: '#f0f0f5',
@@ -161,7 +178,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 3,
     marginBottom: 20,
   },
@@ -169,61 +186,49 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  pickerContainer: {
+    marginVertical: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  pickerLabel: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  picker: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#eaeaea',
+    borderRadius: 8,
+  },
   infoContainer: {
     width: '100%',
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 3,
-    elevation: 2,
   },
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
   },
   infoText: {
     fontSize: 16,
-    color: '#555',
+    marginBottom: 5,
   },
   additionalInfo: {
-    padding: 15,
-    backgroundColor: '#e0f7fa',
-    borderRadius: 10,
-    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+    marginTop: 20,
     shadowColor: '#000',
     shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
     elevation: 2,
   },
   additionalText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 14,
+    color: '#666',
     textAlign: 'center',
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pickerContainer: {
-    marginBottom: 20,
-    width: '100%',
-  },
-  pickerLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
   },
 });
